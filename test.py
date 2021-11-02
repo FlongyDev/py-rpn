@@ -1,6 +1,6 @@
 import unittest
 
-from main import parse_str_postfix, execute_program
+from main import parse_str_postfix, parse_str_infix, execute_program
 
 
 class TestPush(unittest.TestCase):
@@ -241,3 +241,36 @@ class TestPrograms(unittest.TestCase):
 
         self.assertEqual(result1, result2, "Results of similar programs are not equal")
         self.assertEqual(result1,     -15, "test_similar() calculations are invalid")
+
+
+class TestInfixPrograms(unittest.TestCase):
+
+    def test_no_space(self):
+        str_program = "3+6*(3-2)"
+        program = parse_str_infix(str_program)
+        result = execute_program(program)
+        self.assertEqual(result, eval(str_program), "InfixProgram-no-space didn't pass")
+
+    def test_with_space(self):
+        str_program = "5 * 3 + 2 ^ 4 % 5"
+        program = parse_str_infix(str_program)
+        result = execute_program(program)
+        self.assertEqual(result, 16, "InfixProgram-with-space didn't pass")
+
+    def test_1(self):
+        str_program = "6 * (3-5) ^ 2"
+        program = parse_str_infix(str_program)
+        result = execute_program(program)
+        self.assertEqual(result, 24, "InfixProgram-test №1 didn't pass")
+
+    def test_2(self):
+        str_program = "36 // 12"
+        program = parse_str_infix(str_program)
+        result = execute_program(program)
+        self.assertEqual(result, eval(str_program), "InfixProgram-test №2 didn't pass")
+
+    def test_3(self):
+        str_program = "5 * 3 // (6 - 1)"
+        program = parse_str_infix(str_program)
+        result = execute_program(program)
+        self.assertEqual(result, eval(str_program), "InfixProgram-test №3 didn't pass")

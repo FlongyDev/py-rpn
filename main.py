@@ -12,12 +12,14 @@ MULTIPLICATION = 3
 DIVISION = 4
 MODULO = 5
 POWER = 6
+OPEN_BRACKET = 7
 
 all_ops: dict[TOKEN_TYPE, Callable[[list], int]] = {}
 all_tokens: dict[str, TOKEN_TYPE] = {}
+all_priorities: dict[TOKEN_TYPE, int] = {}
 
 
-def binary_op(str_token: str, token: TOKEN_TYPE) -> Callable[[Callable[[int, int], int]], Callable[[list], int]]:
+def binary_op(str_token: str, token: TOKEN_TYPE, priority: int) -> Callable[[Callable[[int, int], int]], Callable[[list], int]]:
     def make_binop(func: Callable[[int, int], int]) -> Callable[[list], int]:
         def redef(stack: list) -> int:
             if len(stack) < 2:
@@ -32,37 +34,38 @@ def binary_op(str_token: str, token: TOKEN_TYPE) -> Callable[[Callable[[int, int
             return result
         all_ops[token] = redef
         all_tokens[str_token] = token
+        all_priorities[token] = priority
         return redef
     return make_binop
 
 
 # add = binary_op('+')(add)
-@binary_op('+', ADDITION)
+@binary_op('+', ADDITION, 0)
 def add(a, b):
     return a + b
 
 
-@binary_op('-', SUBTRACTION)
+@binary_op('-', SUBTRACTION, 0)
 def sub(a, b):
     return a - b
 
 
-@binary_op('*', MULTIPLICATION)
+@binary_op('*', MULTIPLICATION, 1)
 def mul(a, b):
     return a * b
 
 
-@binary_op('//', DIVISION)
+@binary_op('//', DIVISION, 1)
 def div(a, b):
     return a // b
 
 
-@binary_op('%', MODULO)
+@binary_op('%', MODULO, 1)
 def mod(a, b):
     return a % b
 
 
-@binary_op('^', POWER)
+@binary_op('^', POWER, 2)
 def power(a, b):
     return a ** b
 
@@ -83,7 +86,87 @@ def parse_str_postfix(rpn: str) -> INTERMEDIATE:
     return token_list
 
 
-def execute_program(program: list[tuple[TOKEN_TYPE]]) -> int:
+def parse_str_infix(infix: str) -> INTERMEDIATE:
+    token_list = []
+
+    stack = []
+
+    token = ""
+    last_was_digit = False
+
+    def process_op():
+        nonlocal token
+        if not token:
+            return
+
+        op1 = all_tokens.get(token, None)
+        if op1 is None:
+            raise ValueError(f"{token!r} - неизвестная операция")
+
+        priority_op1 = all_priorities[op1]
+
+        while len(stack) >= 1 and stack[-1] != OPEN_BRACKET and all_priorities[stack[-1]] >= priority_op1:
+            token_list.append((stack.pop(),))
+
+        stack.append(op1)
+
+        token = ""
+
+    def process_num():
+        nonlocal token
+        if not token:
+            return
+
+        value = int(token)
+        token_list.append((PUSH, value))
+
+        token = ""
+
+    for ch in infix:
+        if ch.isspace():
+            continue
+
+        if ch == "(":
+            process_op()
+            stack.append(OPEN_BRACKET)
+        elif ch == ")":
+            process_num()
+            while len(stack) >= 1:
+                # TODO: Не рассмотрены функции
+                if (op := stack.pop()) != OPEN_BRACKET:
+                    token_list.append((op,))
+                else:
+                    break
+            else:
+                raise ValueError("В выражении пропущена открывающая скобка")
+        else:
+            if ch.isdigit():
+                if not last_was_digit:
+                    process_op()
+
+                last_was_digit = True
+            else:
+                if last_was_digit:
+                    process_num()
+
+                last_was_digit = False
+            token += ch
+    else:
+        if token:
+            if last_was_digit:
+                process_num()
+            else:
+                raise ValueError("Неверная инфиксная запись (оканчивается на оператор)")
+
+        for op in reversed(stack):
+            if op == OPEN_BRACKET:
+                raise ValueError("В выражении пропущена закрывающая скобка")
+            token_list.append((op,))
+
+    return token_list
+
+
+def execute_program(program: INTERMEDIATE) -> int:
     stack = []
     for op in program:
         token = op[0]
@@ -104,5 +187,10 @@ def execute_program(program: list[tuple[TOKEN_TYPE]]) -> int:
 
 
 if __name__ == "__main__":
+    print("Постфиксная запись")
     print(execute_program(parse_str_postfix("15 7 %")), "==", 1)
     print(execute_program(parse_str_postfix("3 6 3 * 1 4 - 2 ^ // +")), "==", 5)
+
+    print("Инфиксная запись")
+    print(execute_program(parse_str_infix("42 + 27")), "==", 69)
+    print(execute_program(parse_str_infix("(4 + 5) * 2")), "==", 18)
